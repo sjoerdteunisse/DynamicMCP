@@ -47,7 +47,7 @@ builder.Services.AddMcpServer()
     if (toolRegistry.TryGetValue(toolName, out var tool))
     {
         using var httpClient = new HttpClient();
-        //post with inputs
+        //modify to selected tool handling post with inputs
         var response = await httpClient.GetAsync(tool.EndpointUrl, cancellationToken);
         response.EnsureSuccessStatusCode();
 
