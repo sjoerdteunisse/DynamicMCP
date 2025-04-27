@@ -1,6 +1,8 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.OpenApi.Models;
 using ModelContextProtocol.Protocol.Types;
 using System.Collections.Concurrent;
+using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -39,25 +41,57 @@ builder.Services.AddMcpServer()
 }).WithCallToolHandler(async (context, cancellationToken) =>
 {
     var toolRegistry = context.Services.GetRequiredService<ConcurrentDictionary<string, ToolDefinition>>();
-    var s = toolRegistry.Values.First(x => x.Name == context.Params.Name);
+    var tool = toolRegistry.Values.FirstOrDefault(x => x.Name == context.Params.Name);
 
-    var toolName = s.Name;
-    var inputs = s.InputSchema;
+    var toolName = tool?.Name;
+    var inputs = tool?.InputSchema;
 
-    if (toolRegistry.TryGetValue(toolName, out var tool))
+    if (tool != null)
     {
+
         using var httpClient = new HttpClient();
-        //modify to selected tool handling post with inputs
-        var response = await httpClient.GetAsync(tool.EndpointUrl, cancellationToken);
-        response.EnsureSuccessStatusCode();
+        bool isEmptyInputSchema = tool.InputSchema.GetProperty("properties").EnumerateObject().Any() == false;
+        JsonElement responseContent;
 
-        var result = await response.Content.ReadAsStringAsync(cancellationToken: cancellationToken);
+        if (isEmptyInputSchema)
+        {
+            var response = await httpClient.GetAsync(tool.EndpointUrl, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                return new ModelContextProtocol.Protocol.Types.CallToolResponse()
+                {
+                    IsError = true,
+                    Content = new List<Content> { new() { Type = "text", Text = "{\"error\": \"Failed to fetch data\"}" } }
+                };
+            }
 
-        var a = new ModelContextProtocol.Protocol.Types.CallToolResponse();
-        a.Content = result;
-        
+            responseContent = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: cancellationToken);
+        }
+        else
+        {
+            var response = await httpClient.PostAsJsonAsync(tool.EndpointUrl, inputs, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                return new ModelContextProtocol.Protocol.Types.CallToolResponse()
+                {
+                    IsError = true,
+                    Content = new List<Content> { new() { Type = "text", Text = "{\"error\": \"Failed to post data\"}" } }
+                };
+            }
+            responseContent = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: cancellationToken);
+        }
 
-        return result;
+        var content = new Content
+        {
+            Type = "text",
+            Text = JsonSerializer.Serialize(responseContent),
+        };
+
+        return new ModelContextProtocol.Protocol.Types.CallToolResponse()
+        {
+            IsError = false,
+            Content = new List<Content> { content }
+        };
     }
     throw new Exception($"Tool '{toolName}' not found.");
 });
