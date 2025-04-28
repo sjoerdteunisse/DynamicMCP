@@ -14,7 +14,7 @@ public class ToolController : ControllerBase
         _toolRegistry = toolRegistry;
     }
 
-    [HttpPost("add-tool")]
+    [HttpPost]
     public IActionResult AddTool([FromBody] AddToolRequest request)
     {
         if (string.IsNullOrEmpty(request.Name) || string.IsNullOrEmpty(request.EndpointUrl))
