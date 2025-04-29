@@ -1,5 +1,5 @@
 # DynamicMCP Server
-Dynamic Model Context Protocol API
+Dynamic Model Context Protocol API, add tools on the fly and expose them at any time to your MCP clients.
 
 
 
