@@ -1,4 +1,4 @@
-# DynamicMCP
+# DynamicMCP Server
 Dynamic Model Context Protocol API
 
 
